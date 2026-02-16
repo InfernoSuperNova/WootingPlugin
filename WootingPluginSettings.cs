@@ -15,16 +15,25 @@ namespace WootingPlugin
     {
         private const string fileName = "WootingPluginSettings.xml";
         private static string FilePath => Path.Combine(MyFileSystem.UserDataPath, "Storage", fileName);
-        
-        
-        public static WootingPluginSettings I { get; private set; }        
+
+        private static WootingPluginSettings _i;
+        public static WootingPluginSettings I
+        {
+            get
+            {
+                if (_i == null) Load();
+                return _i;
+            }
+            private set => _i = value;
+        }
+
         public float PitchSensitivityMultiplier { get; set; } = 2f;
         public float YawSensitivityMultiplier { get; set; } = 2f;
         public float RollSensitivityMultiplier { get; set; } = 3f;
         
         public WootingPluginSettings()
         {
-            I = this;
+            _i = this;
         }
         
         
@@ -38,8 +47,7 @@ namespace WootingPlugin
                 {
                     XmlSerializer serializer = new XmlSerializer(typeof(WootingPluginSettings));
                     using (XmlReader xml = XmlReader.Create(file))
-                    {
-                        I = (WootingPluginSettings)serializer.Deserialize(xml);
+                    { _i = (WootingPluginSettings)serializer.Deserialize(xml);
                     }
                 }
                 catch (Exception e)
@@ -47,8 +55,13 @@ namespace WootingPlugin
                     MyLogExtensions.Error(MySandboxGame.Log, $"Failed to load WootingPluginSettings from {file}: {e}");
                 }
             }
-            if (I == null) I = new WootingPluginSettings();
-            MyLogExtensions.Info(MySandboxGame.Log, $"WootingPluginSettings loaded from {FilePath}");
+            if (_i == null)
+            {
+                _i = new WootingPluginSettings();
+                MyLogExtensions.Info(MySandboxGame.Log, $"WootingPluginSettings: No config file, using defaults");
+                _i.Save();
+            }
+            
         }
 
         public void Save()

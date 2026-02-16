@@ -1,19 +1,26 @@
 using System;
-using System.Text;
 using Sandbox;
 using Sandbox.Graphics.GUI;
 using VRage;
-using VRage.Input;
 using VRage.Utils;
 using VRageMath;
+using WootingPlugin;
 
-namespace WootingPlugin
+namespace WootingPlugin.Gui
 {
     public class MyGuiScreenPluginConfig : MyGuiScreenBase
     {
         private const float Space = 0.01f;
         private MyGuiControlParent _contentPanel;
         
+        private WootingPluginSettings Settings => WootingPluginSettings.I;
+
+        public MyGuiScreenPluginConfig() : base(new Vector2(0.5f, 0.5f), MyGuiConstants.SCREEN_BACKGROUND_COLOR, new Vector2(0.6f, 0.8f), false, null, MySandboxGame.Config.UIBkOpacity, MySandboxGame.Config.UIOpacity)
+        {
+            EnabledBackgroundFade = true;
+            CloseButtonEnabled = true;
+        }
+
         public override string GetFriendlyName()
         {
             return "MyGuiScreenModConfig";
@@ -28,7 +35,7 @@ namespace WootingPlugin
         
         protected override void OnClosed()
         {
-            WootingPluginSettings.I.Save();
+            Settings.Save();
         }
 
         public override void RecreateControls(bool constructor)
@@ -53,16 +60,15 @@ namespace WootingPlugin
             };
             Controls.Add(scrollPanel);
             
-            WootingPluginSettings settings = WootingPluginSettings.I;
             
             
             MyGuiControlLabel caption = AddCaption("Wooting Plugin Settings");
             Vector2 pos = new Vector2(_contentPanel.Size.X / 2 - Space * 2, -_contentPanel.Size.Y / 2);
             pos.Y += Space;
             
-            pos = AddTextbox(pos, settings.PitchSensitivityMultiplier.ToString(), "Pitch Sensitivity Multiplier", 0.1m, 10, tb => SetPitchSensitivityMultiplier(tb));
-            pos = AddTextbox(pos, settings.YawSensitivityMultiplier.ToString(), "Yaw Sensitivity Multiplier", 0.1m, 10, tb => SetYawSensitivityMultiplier(tb));
-            pos = AddTextbox(pos, settings.RollSensitivityMultiplier.ToString(), "Roll Sensitivity Multiplier", 0.1m, 10, tb => SetRollSensitivityMultiplier(tb));
+            pos = AddTextbox(pos, Settings.PitchSensitivityMultiplier.ToString(), "Pitch Sensitivity Multiplier", 0.1m, 10, tb => SetPitchSensitivityMultiplier(tb));
+            pos = AddTextbox(pos, Settings.YawSensitivityMultiplier.ToString(), "Yaw Sensitivity Multiplier", 0.1m, 10, tb => SetYawSensitivityMultiplier(tb));
+            pos = AddTextbox(pos, Settings.RollSensitivityMultiplier.ToString(), "Roll Sensitivity Multiplier", 0.1m, 10, tb => SetRollSensitivityMultiplier(tb));
             
             
             Vector2 closeButtonPos = new Vector2(0, (m_size.Value.Y / 2) - Space);
@@ -97,19 +103,19 @@ namespace WootingPlugin
         {
             if (!float.TryParse(tb.Text, out var multiplier)) return;
             
-            WootingPluginSettings.I.PitchSensitivityMultiplier = multiplier;
+            Settings.PitchSensitivityMultiplier = multiplier;
         }
         
         private void SetYawSensitivityMultiplier(MyGuiControlTextbox tb)
         {
             if (!float.TryParse(tb.Text, out var multiplier)) return;
-            WootingPluginSettings.I.YawSensitivityMultiplier = multiplier;
+            Settings.YawSensitivityMultiplier = multiplier;
         }
         
         private void SetRollSensitivityMultiplier(MyGuiControlTextbox tb)
         {
             if (!float.TryParse(tb.Text, out var multiplier)) return;
-            WootingPluginSettings.I.RollSensitivityMultiplier = multiplier;
+            Settings.RollSensitivityMultiplier = multiplier;
         }
         
         private void OnCloseClicked(MyGuiControlButton btn)
