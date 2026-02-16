@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -117,12 +119,14 @@ namespace WootingPlugin
         // Some default sensitivity multpliers (looking at you, roll) make less sense once you have analogue control over that axis
         private static readonly Dictionary<MyStringId, float> m_sensitivityMultipliers= new Dictionary<MyStringId, float>()
         {
-            { MyControlsSpace.ROLL_LEFT, 3f },
-            { MyControlsSpace.ROLL_RIGHT, 3f },
-            { MyControlsSpace.ROTATION_DOWN, 2f },
-            { MyControlsSpace.ROTATION_UP, 2f },
-            { MyControlsSpace.ROTATION_LEFT, 2f },
-            { MyControlsSpace.ROTATION_RIGHT, 2f },
+            { MyControlsSpace.ROTATION_DOWN, WootingPluginSettings.I.PitchSensitivityMultiplier },
+            { MyControlsSpace.ROTATION_UP, WootingPluginSettings.I.PitchSensitivityMultiplier },
+            
+            { MyControlsSpace.ROTATION_LEFT, WootingPluginSettings.I.YawSensitivityMultiplier },
+            { MyControlsSpace.ROTATION_RIGHT, WootingPluginSettings.I.YawSensitivityMultiplier },
+            
+            { MyControlsSpace.ROLL_LEFT, WootingPluginSettings.I.RollSensitivityMultiplier },
+            { MyControlsSpace.ROLL_RIGHT, WootingPluginSettings.I.RollSensitivityMultiplier },
         };
         static float Postfix(float returnValue, MyStringId controlId)
         {
@@ -145,9 +149,8 @@ namespace WootingPlugin
             float key2Val = GetAnalogValue(control.GetSecondKeyboardControl());
             float analogVal = key1Val > key2Val ? key1Val : key2Val;
 
-            if (controlId == MyControlsSpace.ROLL_LEFT || controlId == MyControlsSpace.ROLL_RIGHT) analogVal *= 3f; // Stupid!!
-            if (controlId == MyControlsSpace.ROTATION_DOWN || controlId == MyControlsSpace.ROTATION_UP || controlId == MyControlsSpace.ROTATION_LEFT || controlId == MyControlsSpace.ROTATION_RIGHT) analogVal *= 2f; // AlsoStupid!!
-
+            if (m_sensitivityMultipliers.TryGetValue(controlId, out var multiplier)) analogVal *= multiplier;
+            
             
             // Use whichever is greater: the Wooting analog value or the original game value.
             // This way analog always works, and non-Wooting inputs (gamepad, mouse) still function.
@@ -162,7 +165,6 @@ namespace WootingPlugin
 
                 if (result != WootingAnalogResult.Ok)
                 {
-                    MyLogExtensions.Error(MySandboxGame.Log, $"WootingPlugin: Failed to read key {key} from WootingAnalogSDK: {result}");
                     if (result == WootingAnalogResult.NoDevices)
                     {
                         WootingPlugin.Instance.DeviceFailed();
