@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -38,7 +38,7 @@ namespace WootingPlugin
 
                 if (result == WootingAnalogResult.Ok)
                 {
-                    MyLogExtensions.Info(MySandboxGame.Log, "WootingPlugin initialized successfully");
+                    MyLogExtensions.Info(MySandboxGame.Log, $"WootingPlugin initialized successfully, {numDev} device(s)");
                 }
                 else
                 {
@@ -62,7 +62,6 @@ namespace WootingPlugin
             }
 
             WootingAnalogSDK.SetKeycodeMode(KeycodeType.VirtualKey);
-
         }
 
         public void DeviceFailed()
@@ -90,10 +89,14 @@ namespace WootingPlugin
         }
     }
 
-    [HarmonyPatch(typeof(MyControl), "GetAnalogState")]
+    /// <summary>
+    /// Changed to patch MyVrageInput.GetGameControlAnalogState instead of MyControl.GetAnalogState (thanksKeen)
+    /// </summary>
+    [HarmonyPatch(typeof(MyVRageInput), "GetGameControlAnalogState")]
     internal static class Patch
     {
-        public static bool ReadAnalog { set; get; }
+        public static bool ReadAnalog { get; set; }
+        private static FieldInfo hasFocusField = typeof(MySandboxGame).GetField("hasFocus", BindingFlags.NonPublic | BindingFlags.Instance);
 
         private static readonly MyStringId[] m_analogControls = new MyStringId[]
         {
@@ -110,24 +113,52 @@ namespace WootingPlugin
             MyControlsSpace.ROTATION_RIGHT,
             MyControlsSpace.ROTATION_UP,
         };
-
-        private static float Postfix(float returnValue, ref MyControl __instance)
+        
+        // Some default sensitivity multpliers (looking at you, roll) make less sense once you have analogue control over that axis
+        private static readonly Dictionary<MyStringId, float> m_sensitivityMultipliers= new Dictionary<MyStringId, float>()
         {
-            if (ReadAnalog && m_analogControls.Contains(__instance.GetGameControlEnum()))
+            { MyControlsSpace.ROLL_LEFT, 3f },
+            { MyControlsSpace.ROLL_RIGHT, 3f },
+            { MyControlsSpace.ROTATION_DOWN, 2f },
+            { MyControlsSpace.ROTATION_UP, 2f },
+            { MyControlsSpace.ROTATION_LEFT, 2f },
+            { MyControlsSpace.ROTATION_RIGHT, 2f },
+        };
+        static float Postfix(float returnValue, MyStringId controlId)
+        {
+            if (!ReadAnalog) return returnValue;
+            if (!m_analogControls.Contains(controlId)) return returnValue;
+            if (MySandboxGame.Static.PauseInput) return returnValue;
+            
+            // Check if the game has focus
+            if (hasFocusField != null && MySandboxGame.Static != null)
             {
-                float key1Val = GetAnalogValue(__instance.GetKeyboardControl());
-                float key2Val = GetAnalogValue(__instance.GetSecondKeyboardControl());
-
-                return key1Val > key2Val ? key1Val : key2Val;
+                bool hasFocus = (bool)hasFocusField.GetValue(MySandboxGame.Static);
+                if (!hasFocus) return returnValue;
             }
-            return returnValue;
+
+ 
+            MyControl control = MyInput.Static.GetGameControl(controlId);
+            if (control == null) return returnValue;
+
+            float key1Val = GetAnalogValue(control.GetKeyboardControl());
+            float key2Val = GetAnalogValue(control.GetSecondKeyboardControl());
+            float analogVal = key1Val > key2Val ? key1Val : key2Val;
+
+            if (controlId == MyControlsSpace.ROLL_LEFT || controlId == MyControlsSpace.ROLL_RIGHT) analogVal *= 3f; // Stupid!!
+            if (controlId == MyControlsSpace.ROTATION_DOWN || controlId == MyControlsSpace.ROTATION_UP || controlId == MyControlsSpace.ROTATION_LEFT || controlId == MyControlsSpace.ROTATION_RIGHT) analogVal *= 2f; // AlsoStupid!!
+
+            
+            // Use whichever is greater: the Wooting analog value or the original game value.
+            // This way analog always works, and non-Wooting inputs (gamepad, mouse) still function.
+            return (analogVal != 0f) ? analogVal : returnValue;
         }
 
         private static float GetAnalogValue(MyKeys key)
         {
             if (key != MyKeys.None)
             {
-                var (value, result) = WootingAnalogSDK.ReadAnalog((byte)key);
+                var (value, result) = WootingAnalogSDK.ReadAnalog((ushort)key);
 
                 if (result != WootingAnalogResult.Ok)
                 {
